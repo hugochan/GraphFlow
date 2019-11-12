@@ -1,0 +1,5 @@
+gensim==3.5.0
+numpy==1.14.5
+PyYAML==5.1
+torch==0.4.1
+

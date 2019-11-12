@@ -1,0 +1,106 @@
+# Data
+dataset_name: 'quac'
+trainset: '../data/quac/train.json'
+devset: '../data/quac/dev.json'
+testset: null
+embed_file: '../data/coqa/glove.840B.300d.txt'
+saved_vocab_file: '../data/quac/word_model_min_5'
+pretrained: null
+
+
+# Output
+out_dir: '../out/quac/graphflow_dynamic_graph'
+
+
+# Preprocessing
+min_freq: 5
+top_vocab: 200000
+n_history: 2
+no_pre_question: False
+no_pre_answer: False
+max_turn_num: 20
+
+
+
+# Model
+embed_type: 'glove'
+vocab_embed_size: 300
+fix_vocab_embed: True
+f_qem: True # Context exact match feature
+f_pos: True # Context POS feature
+f_ner: True # Context NER feature
+f_tf: False # Context TF feature
+ctx_exact_match_embed_dim: 3
+ctx_pos_embed_dim: 12
+ctx_ner_embed_dim: 8
+answer_marker_embed_dim: 10
+use_ques_marker: True
+ques_marker_embed_dim: 3
+ques_turn_marker_embed_dim: 5
+
+hidden_size: 300
+word_dropout: 0.3
+bert_dropout: 0.4
+rnn_dropout: 0.3
+rnn_input_dropout: null
+
+# Graph neural networks
+use_gnn: True
+bignn: False
+static_graph: False
+temporal_gnn: True
+ctx_graph_hops: 3
+ctx_graph_topk: 10
+graph_learner_num_pers: 1
+
+
+# Spatial kernels
+use_spatial_kernels: False
+n_spatial_kernels: 2
+use_position_enc: False
+max_position_distance: 160
+position_emb_size: 50
+
+
+# Bert configure
+use_bert: True
+finetune_bert: False
+use_bert_weight: True
+use_bert_gamma: False
+bert_model: 'bert-large-uncased'
+bert_dim: 1024
+bert_max_seq_len: 500
+bert_doc_stride: 250
+bert_layer_indexes:
+  - 0
+  - 24
+
+
+# Optimizer
+optimizer: 'adamax'
+learning_rate: 0.001
+grad_clipping: 10
+
+
+# Training & testing
+random_seed: 1234
+shuffle: True # Whether to shuffle the examples during training
+batch_size: 1 # No. of dialogs per batch
+grad_accumulated_steps: 1
+test_batch_size: 1
+max_epochs: 100
+patience: 10
+verbose: 1000 # Print every X batches
+unk_answer_threshold: 0.3
+max_answer_len: 35 # Set max answer length for decoding
+predict_train: True # Whether to predict on training set
+out_predictions: True # Whether to output predictions
+predict_raw_text: True # Whether to use raw text and offsets for prediction
+save_params: True # Whether to save params
+logging: True # Turn it off for Codalab
+out_pred_in_folder: True # Turn it off for Codalab
+
+
+# Device
+no_cuda: False
+cuda_id: 0
