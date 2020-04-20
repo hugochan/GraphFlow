@@ -1,7 +1,7 @@
 # GraphFlow
 
 
-Code & data accompanying the ICML 2019 workshop paper ["GRAPHFLOW: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension"](https://arxiv.org/abs/1908.00059)
+Code & data accompanying the IJCAI 2020 paper ["GRAPHFLOW: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension"](https://arxiv.org/abs/1908.00059)
 
 
 ## Get started
@@ -59,7 +59,7 @@ Please take the following steps to create a python virtual environment.
 
 If you found this code useful, please consider citing the following paper:
 
-Yu Chen, Lingfei Wu, Mohammed J. Zaki. **"Graphflow: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension."** *In ICML 2019 Workshop on Learning and Reasoning with Graph-Structured Representations (ICML LRG 2019). June 2019.*
+Yu Chen, Lingfei Wu, Mohammed J. Zaki. **"Graphflow: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension."** In *Proceedings of the 29th International Joint Conference on Artificial Intelligence (IJCAI 2020)*, Yokohama, Japan, Jul 11-17, 2020.
 
 
     @article{chen2019graphflow,
