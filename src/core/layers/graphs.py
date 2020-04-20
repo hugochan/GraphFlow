@@ -74,16 +74,16 @@ class GraphLearner(nn.Module):
         # attention = torch.mean(torch.matmul(context_fc, context_fc.transpose(-1, -2)), dim=2)
 
 
-        # # 3) Best attention mechanism
-        # context_fc = context.unsqueeze(2) * torch.relu(self.weight_tensor).unsqueeze(0).unsqueeze(0).unsqueeze(-2)
-        # attention = torch.mean(torch.matmul(context_fc, context.unsqueeze(2).transpose(-1, -2)), dim=2)
+        # 3) Best attention mechanism
+        context_fc = context.unsqueeze(2) * torch.relu(self.weight_tensor).unsqueeze(0).unsqueeze(0).unsqueeze(-2)
+        attention = torch.mean(torch.matmul(context_fc, context.unsqueeze(2).transpose(-1, -2)), dim=2)
 
 
-        # 4）weighted cosine
-        context_fc = context.unsqueeze(2) * self.weight_tensor.unsqueeze(0).unsqueeze(0).unsqueeze(-2)
-        context_norm = F.normalize(context_fc, p=2, dim=-1)
-        attention = torch.matmul(context_norm, context_norm.transpose(-1, -2)).mean(2)
-        markoff_value = 0
+        # # 4）weighted cosine
+        # context_fc = context.unsqueeze(2) * self.weight_tensor.unsqueeze(0).unsqueeze(0).unsqueeze(-2)
+        # context_norm = F.normalize(context_fc, p=2, dim=-1)
+        # attention = torch.matmul(context_norm, context_norm.transpose(-1, -2)).mean(2)
+        # markoff_value = 0
 
 
         if ctx_mask is not None:
@@ -205,12 +205,8 @@ class ContextGraphNN(nn.Module):
         return node_state
 
     def bignn_update(self, node_state, weighted_adjacency_matrix):
-        # weighted_adjacency_matrix_in = torch.softmax(weighted_adjacency_matrix, dim=-1)
-        # weighted_adjacency_matrix_out = torch.softmax(weighted_adjacency_matrix.transpose(-1, -2), dim=-1)
-
-        weighted_adjacency_matrix_in = weighted_adjacency_matrix / torch.clamp(torch.sum(weighted_adjacency_matrix, dim=-1, keepdim=True), min=VERY_SMALL_NUMBER)
-        weighted_adjacency_matrix_out = weighted_adjacency_matrix.transpose(-1, -2) / torch.clamp(torch.sum(weighted_adjacency_matrix.transpose(-1, -2), dim=-1, keepdim=True), min=VERY_SMALL_NUMBER)
-
+        weighted_adjacency_matrix_in = torch.softmax(weighted_adjacency_matrix, dim=-1)
+        weighted_adjacency_matrix_out = torch.softmax(weighted_adjacency_matrix.transpose(-1, -2), dim=-1)
 
         for _ in range(self.graph_hops):
             agg_state_in = self.aggregate_avgpool(node_state, weighted_adjacency_matrix_in)
@@ -220,8 +216,7 @@ class ContextGraphNN(nn.Module):
         return node_state
 
     def gnn_update(self, node_state, weighted_adjacency_matrix):
-        # weighted_adjacency_matrix = torch.softmax(weighted_adjacency_matrix, dim=-1)
-        weighted_adjacency_matrix = weighted_adjacency_matrix / torch.clamp(torch.sum(weighted_adjacency_matrix, dim=-1, keepdim=True), min=VERY_SMALL_NUMBER)
+        weighted_adjacency_matrix = torch.softmax(weighted_adjacency_matrix, dim=-1)
 
 
         for _ in range(self.graph_hops):

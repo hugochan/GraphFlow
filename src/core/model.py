@@ -11,7 +11,8 @@ import torch.nn.functional as F
 
 
 from .utils.coqa import compute_eval_metric
-from .utils.quac import eval_fn
+from .utils.quac import eval_fn as quac_eval_fn
+from .utils.doqa import eval_fn as doqa_eval_fn
 from .utils import constants as Constants
 from .word_model import WordModel
 from .models.graphflow import GraphFlow
@@ -331,7 +332,7 @@ class QuACModel(Model):
 
     def __init__(self, config, train_set=None):
         super(QuACModel, self).__init__(config, train_set)
-
+        self.eval_fn = quac_eval_fn if config['dataset_name'] == 'quac' else doqa_eval_fn
 
     def predict(self, ex, step, update=True, out_predictions=False):
         # Train/Eval mode
@@ -342,12 +343,11 @@ class QuACModel(Model):
         score_s, score_e, unk_probs, score_yesno, score_followup = res['start_logits'], res['end_logits'], res['unk_probs'], res['score_yesno'], res['score_followup']
 
         output = {
-            'metrics': {'f1': 0.0, 'heq': 0.0, 'dheq': 0.0},
+            'metrics': None,
             'loss': 0.0,
             'total_qs': 0,
             'total_dials': 0
         }
-
 
         # Compute loss
         loss = self.compute_span_loss(score_s, score_e, ex['targets'], ex['span_mask'])
@@ -375,7 +375,7 @@ class QuACModel(Model):
 
         if (not update) or self.config['predict_train']:
             predictions, spans, yesnos, followups = self.extract_predictions(ex, score_s, score_e, unk_probs, score_yesno, score_followup, self.config['unk_answer_threshold'], res['turn_mask'])
-            output['metrics'], total_qs, total_dials = eval_fn(ex['answers'], predictions, ex['raw_evidence_text'])
+            output['metrics'], total_qs, total_dials = self.eval_fn(ex['answers'], predictions, ex['raw_evidence_text'])
             output['total_qs'] = total_qs
             output['total_dials'] = total_dials
 
@@ -434,12 +434,20 @@ class QuACModel(Model):
                     yesno = Constants.QuAC_YESNO_OTHER
 
                 followup_type = np.argmax(_followup[j]).item()
-                if followup_type == Constants.QuAC_FOLLOWUP_YES_LABEL:
-                    followup = Constants.QuAC_FOLLOWUP_YES
-                elif followup_type == Constants.QuAC_FOLLOWUP_NO_LABEL:
-                    followup = Constants.QuAC_FOLLOWUP_NO
+
+                if self.config['dataset_name'] == 'quac':
+                    if followup_type == Constants.QuAC_FOLLOWUP_YES_LABEL:
+                        followup = Constants.QuAC_FOLLOWUP_YES
+                    elif followup_type == Constants.QuAC_FOLLOWUP_NO_LABEL:
+                        followup = Constants.QuAC_FOLLOWUP_NO
+                    else:
+                        followup = Constants.QuAC_FOLLOWUP_OTHER
+
                 else:
-                    followup = Constants.QuAC_FOLLOWUP_OTHER
+                    if followup_type == Constants.DoQA_FOLLOWUP_YES_LABEL:
+                        followup = Constants.DoQA_FOLLOWUP_YES
+                    else:
+                        followup = Constants.DoQA_FOLLOWUP_NO
 
                 para_pred.append(pred)
                 para_span.append(span)

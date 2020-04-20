@@ -1,9 +1,3 @@
-'''
-Created on Nov, 2018
-
-@author: hugo
-
-'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -80,7 +74,8 @@ class GraphFlow(nn.Module):
                 self.ques_num_marker_embed = nn.Embedding(config['max_turn_num'], ques_turn_marker_embed_dim)
 
         if self.use_bert and self.use_bert_weight:
-            num_bert_layers = config['bert_layer_indexes'][1] - config['bert_layer_indexes'][0]
+            bert_layer_start, bert_layer_end = config['bert_layer_indexes'].split(',')
+            num_bert_layers = int(bert_layer_end) - int(bert_layer_start)
             self.logits_bert_layers = nn.Parameter(nn.init.xavier_uniform_(torch.Tensor(1, num_bert_layers)))
             if config['use_bert_gamma']:
                 self.gamma_bert_layers = nn.Parameter(nn.init.constant_(torch.Tensor(1, 1), 1.))
@@ -140,7 +135,7 @@ class GraphFlow(nn.Module):
         self.linear_end = nn.Linear(hidden_size, hidden_size, bias=False)
         if self.config['dataset_name'].lower() == 'coqa':
             self.fc_clf = nn.Linear(hidden_size, 2 * hidden_size * self.config['coqa_answer_class_num'], bias=True)
-        elif self.config['dataset_name'].lower() == 'quac':
+        elif self.config['dataset_name'].lower() in ('quac', 'doqa'):
             self.linear_unk_answer = nn.Linear(hidden_size, 2 * hidden_size, bias=False)
             self.fc_followup = nn.Linear(hidden_size, 2 * hidden_size * self.config['quac_followup_class_num'], bias=True)
             self.fc_yesno = nn.Linear(hidden_size, 2 * hidden_size * self.config['quac_yesno_class_num'], bias=True)
@@ -296,37 +291,42 @@ class GraphFlow(nn.Module):
 
 
 
-        # Run GNN on context graphs Layer 2
-        ctx_cat_l2 = torch.cat([ctx_node_state_l1, ctx_emb.unsqueeze(1).expand(-1, questions.size(1), -1, -1)], -1)
-        ques_cat_l2 = torch.cat([ques_hidden_state.view(questions.size() + (-1,)), ques_emb.view(questions.size() + (-1,))], -1)
-        if self.use_bert:
-            ctx_cat_l2 = torch.cat([ctx_cat_l2, bert_context_f.unsqueeze(1).expand(-1, questions.size(1), -1, -1)], -1)
-            ques_cat_l2 = torch.cat([ques_cat_l2, bert_questions_f], -1)
-        ctx_aware_ques_emb_l2 = self.ctx2ques_attn_l2(ctx_cat_l2, ques_cat_l2, ques_hidden_state.view(questions.size() + (-1,)), \
-            ques_mask.view(ques_len.size() + (-1,)))
-        # Shape: (batch_size, turn_size, ctx_size, 2 * hidden_size)
-        ctx_hidden_state_1 = torch.cat([ctx_node_state_l1, ctx_aware_ques_emb_l2], -1)
+        if self.config.get('stacked_layer', True):
+            # Run GNN on context graphs Layer 2
+            ctx_cat_l2 = torch.cat([ctx_node_state_l1, ctx_emb.unsqueeze(1).expand(-1, questions.size(1), -1, -1)], -1)
+            ques_cat_l2 = torch.cat([ques_hidden_state.view(questions.size() + (-1,)), ques_emb.view(questions.size() + (-1,))], -1)
+            if self.use_bert:
+                ctx_cat_l2 = torch.cat([ctx_cat_l2, bert_context_f.unsqueeze(1).expand(-1, questions.size(1), -1, -1)], -1)
+                ques_cat_l2 = torch.cat([ques_cat_l2, bert_questions_f], -1)
+            ctx_aware_ques_emb_l2 = self.ctx2ques_attn_l2(ctx_cat_l2, ques_cat_l2, ques_hidden_state.view(questions.size() + (-1,)), \
+                ques_mask.view(ques_len.size() + (-1,)))
+            # Shape: (batch_size, turn_size, ctx_size, 2 * hidden_size)
+            ctx_hidden_state_1 = torch.cat([ctx_node_state_l1, ctx_aware_ques_emb_l2], -1)
 
 
-        ctx_node_state_l2 = self.ctx_enc_l2(ctx_hidden_state_1.view(-1, ctx_hidden_state_1.size(-2), ctx_hidden_state_1.size(-1)), expand_ctx_len.view(-1))[0]\
-                    .view(ctx_hidden_state_1.shape[:3] + (-1,))
+            ctx_node_state_l2 = self.ctx_enc_l2(ctx_hidden_state_1.view(-1, ctx_hidden_state_1.size(-2), ctx_hidden_state_1.size(-1)), expand_ctx_len.view(-1))[0]\
+                        .view(ctx_hidden_state_1.shape[:3] + (-1,))
 
 
-        if self.config['use_gnn']:
-            for turn_id in range(questions.size(1)):
-                # shape: (batch_size, ctx_size, hidden_size)
-                if self.static_graph:
-                    ctx_turn_node_state = self.ctx_gnn_l2(ctx_node_state_l2[:, turn_id].clone(), ctx_adjacency_matrix)
-                else:
-                    ctx_turn_node_state = self.ctx_gnn_l2(ctx_node_state_l2[:, turn_id].clone(), ctx_adjacency_matrix[:, turn_id])
-                ctx_node_state_l2[:, turn_id] = ctx_turn_node_state
-                if self.config['temporal_gnn']:
-                    next_turn_id = turn_id + 1
-                    if next_turn_id < questions.size(1):
-                        ctx_node_state_l2[:, next_turn_id] = self.graph_gru_step_l2(ctx_turn_node_state, ctx_node_state_l2[:, next_turn_id].clone())
+            if self.config['use_gnn']:
+                for turn_id in range(questions.size(1)):
+                    # shape: (batch_size, ctx_size, hidden_size)
+                    if self.static_graph:
+                        ctx_turn_node_state = self.ctx_gnn_l2(ctx_node_state_l2[:, turn_id].clone(), ctx_adjacency_matrix)
+                    else:
+                        ctx_turn_node_state = self.ctx_gnn_l2(ctx_node_state_l2[:, turn_id].clone(), ctx_adjacency_matrix[:, turn_id])
+                    ctx_node_state_l2[:, turn_id] = ctx_turn_node_state
+                    if self.config['temporal_gnn']:
+                        next_turn_id = turn_id + 1
+                        if next_turn_id < questions.size(1):
+                            ctx_node_state_l2[:, next_turn_id] = self.graph_gru_step_l2(ctx_turn_node_state, ctx_node_state_l2[:, next_turn_id].clone())
+
+            ctx_node_state_final = ctx_node_state_l2
+
+        else:
+            ctx_node_state_final = ctx_node_state_l1
 
 
-        ctx_node_state_final = ctx_node_state_l2
 
         # Prediction module
         ques_state = self.rnn_ques_over_time(ques_state, num_turn.view(-1))[0]

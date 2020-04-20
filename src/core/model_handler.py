@@ -30,7 +30,7 @@ class ModelHandler(object):
                                 'em': AverageMeter()}
             config['coqa_answer_class_num'] = Constants.CoQA_ANSWER_CLASS_NUM
 
-        elif config['dataset_name'] == 'quac':
+        elif config['dataset_name'] in ('quac', 'doqa'):
             QAModel = QuACModel
             # Evaluation Metrics:
             self._train_loss = AverageMeter()
@@ -41,8 +41,13 @@ class ModelHandler(object):
             self._dev_metrics = {'f1': AverageMeter(),
                                 'heq': AverageMeter(),
                                 'dheq': AverageMeter()}
+
             config['quac_yesno_class_num'] = Constants.QuAC_YESNO_CLASS_NUM
-            config['quac_followup_class_num'] = Constants.QuAC_FOLLOWUP_CLASS_NUM
+            if config['dataset_name'] == 'quac':
+                config['quac_followup_class_num'] = Constants.QuAC_FOLLOWUP_CLASS_NUM
+            else:
+                config['quac_followup_class_num'] = Constants.DoQA_FOLLOWUP_CLASS_NUM
+
         else:
             raise ValueError('Unknown dataset name: {}'.format(config['dataset_name']))
 
@@ -149,8 +154,9 @@ class ModelHandler(object):
             self.logger.write_to_file(format_str)
             print(format_str)
 
-            self.model.scheduler.step(self._dev_metrics['f1'].mean())
-            if self._best_metrics['f1'] <= self._dev_metrics['f1'].mean():  # Can be one of loss, f1, or em.
+            early_stop_metric = self.config.get('early_stop_metric', 'f1')
+            self.model.scheduler.step(self._dev_metrics[early_stop_metric].mean())
+            if self._best_metrics[early_stop_metric] <= self._dev_metrics[early_stop_metric].mean():  # Can be one of loss, f1, or em.
                 self._best_epoch = self._epoch
                 for k in self._dev_metrics:
                     self._best_metrics[k] = self._dev_metrics[k].mean()
@@ -169,11 +175,18 @@ class ModelHandler(object):
 
         print("Finished Training: {}".format(self.dirname))
         print(self.summary())
+        return self._best_metrics
 
     def test(self):
         if self.test_loader is None:
             print("No testing set specified -- skipped testing.")
             return
+
+        # Restore best model
+        print('Restoring best model')
+        self.model.init_saved_network(self.dirname)
+        self.model.network = self.model.network.to(self.device)
+
 
         self.is_test = True
         self._reset_metrics()
@@ -197,6 +210,11 @@ class ModelHandler(object):
         print(self.self_report(self._n_test_batches, 'test'))
         print("Finished Testing: {}".format(self.dirname))
         self.logger.close()
+
+        test_metrics = {}
+        for k in self._dev_metrics:
+            test_metrics[k] = self._dev_metrics[k].mean()
+        return test_metrics
 
     def _run_epoch(self, data_loader, training=True, verbose=10, out_predictions=False):
         start_time = time.time()
