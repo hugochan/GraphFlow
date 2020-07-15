@@ -1,7 +1,7 @@
 # GraphFlow
 
 
-Code & data accompanying the IJCAI 2020 paper ["GRAPHFLOW: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension"](https://arxiv.org/abs/1908.00059)
+Code & data accompanying the IJCAI 2020 paper ["GRAPHFLOW: Exploiting Conversation Flow with Graph Neural Networks for Conversational Machine Comprehension"](https://www.ijcai.org/Proceedings/2020/171)
 
 
 ## Get started
